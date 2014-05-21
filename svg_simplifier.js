@@ -1,4 +1,5 @@
 var XMLDOMParser = require('xmldom').DOMParser;
+var SvgPath = require('svgpath');
 
 var svgPresentationAttributes = {
 	'alignment-baseline': true,
@@ -168,16 +169,36 @@ function prepare_svg(svgData)
     result.isModified = true;
   }
   for (var i = 0; i < pathTags.length; i++) {
+    var transformString = '';
     // Ignoring attributes for 'g'
     if (pathTags[i].parentNode && pathTags[i].parentNode.tagName == 'g') {
       add_ignored_attributes(pathTags[i].parentNode);
+
+      // Get transform attribute for parent 'g'
+      if (pathTags[i].parentNode.hasAttribute('transform')) {
+        transformString = pathTags[i].parentNode.getAttribute('transform');
+      }
     }
 
     // Ignoring attributes for 'path'
     add_ignored_attributes(pathTags[i]);
 
-    // Merge paths
-    result.path += pathTags[i].getAttribute('d');
+    // Get transform attribute for 'path'
+    if (pathTags[i].hasAttribute('transform')) {
+      transformString += ' ' + pathTags[i].getAttribute('transform');
+    }
+
+    var path = pathTags[i].getAttribute('d');
+
+    if (transformString != '') {
+      // Apply transform attributes
+      path = (new SvgPath(path))
+        .transform(transformString)
+        .toString();
+    }
+
+		// Merge paths
+    result.path += path;
   }
 
   result.ignored = Object.keys(ignoredTags).concat(Object.keys(ignoredAttributes));
