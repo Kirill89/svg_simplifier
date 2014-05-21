@@ -14,7 +14,7 @@ outputData += '     baseProfile="full"';
 outputData += '     xmlns="http://www.w3.org/2000/svg"';
 outputData += '     xmlns:xlink="http://www.w3.org/1999/xlink"';
 outputData += '     xmlns:ev="http://www.w3.org/2001/xml-events"';
-outputData += '     width="50" height="50">';
+outputData += '     width="' + simplifierData.width + '" height="' + simplifierData.height + '">';
 outputData += '     <path d="' + simplifierData.path + '"/>';
 outputData += '</svg>';
 console.log(simplifierData);
