@@ -153,6 +153,8 @@ function prepare_svg(svgData)
   // Add tags by name to tags ignore list
   var allTags = svgTag.getElementsByTagName('*');
   for (var i = 0; i < allTags.length; i++) {
+    // TODO: Add here converting shapes to paths (and append resulting paths to XML tree),
+    // don't forget add your tag to svgAllowedTags object
     if (!svgAllowedTags[allTags[i].tagName]) {
       result.isModified = true;
       ignoredTags[allTags[i].tagName] = true;
