@@ -1,0 +1,10 @@
+{
+  "name": "svg_simplifier",
+  "devDependencies": {},
+  "private": true,
+  "dependencies": {
+    "mocha": "*",
+    "svgpath": "~1.0.5",
+    "xmldom": "~0.1.19"
+  }
+}
