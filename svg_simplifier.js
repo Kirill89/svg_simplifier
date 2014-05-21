@@ -63,6 +63,13 @@ var svgPresentationAttributes = {
 	'writing-mode': true
 };
 
+var svgAllowedTags = {
+  'path': true,
+  'metadata': true,
+  'title': true,
+  'desc': true
+};
+
 //
 // Find all presentation attributes in tag
 //
@@ -143,10 +150,10 @@ function prepare_svg(svgData)
   var ignoredTags = {};
   var ignoredAttributes = {};
 
-  // Add tags by name to tags ignore list (simplifier allows only 'path' tags)
+  // Add tags by name to tags ignore list
   var allTags = svgTag.getElementsByTagName('*');
   for (var i = 0; i < allTags.length; i++) {
-    if (allTags[i].tagName != 'path') {
+    if (!svgAllowedTags[allTags[i].tagName]) {
       result.isModified = true;
       ignoredTags[allTags[i].tagName] = true;
     }
