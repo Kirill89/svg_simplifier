@@ -64,14 +64,6 @@ var svgPresentationAttributes = {};
   'writing-mode'
 ]).forEach(function (value) {svgPresentationAttributes[value] = true;});
 
-var svgAllowedTags = {};
-([
-  'path',
-  'metadata',
-  'title',
-  'desc'
-]).forEach(function (value) {svgAllowedTags[value] = true;});
-
 //
 // Find all presentation attributes in tag
 //
@@ -91,35 +83,57 @@ function find_presentation_attributes (tag) {
 }
 
 //
-// Merge all 'path' tags in svgElement by recursive
+// Walk through full svg (XML) tree and merge all 'path' tags by recursive
 //
-// svgElement - XML node
+// svgElement - root XML node (tag 'svg')
+//
+// ignoreAttributesCallback - function (xmlElement, attributesArray) - callback function to inform about ignoring attributes to current node
+//
+// ignoreTagsCallback - function (xmlElement) - callback function to inform about ignoring tag
 //
 // transform - only for recursive call, contains 'transform' attribute data for all parent nodes
 //
-// resultPath - only for recursive call, contains one iteration result
+// result - only for recursive call, contains one iteration result and 'path' tags count
 //
-// Returns string path
+// Returns object {'path':(string), 'count':(integer)}
 //
-function merge_paths(svgElement, transform, resultPath) {
+function merge_paths(svgElement, ignoreAttributesCallback, ignoreTagsCallback, transform, result) {
   if (!transform) {
     transform = '';
   }
-  if (!resultPath) {
-    resultPath = '';
+  if (!result) {
+    result = {'path':'', 'count':0};
+  }
+
+  // Callback for tag if it contains unsupported attributes
+  function ignoreAttributes(tag) {
+    if (typeof(ignoreAttributesCallback) == 'function') {
+      var ignoredAttributes = find_presentation_attributes(tag);
+      if (ignoredAttributes.length > 0) {
+        ignoreAttributesCallback(tag, ignoredAttributes);
+      }
+    }
   }
 
   for (var i = 0; i < svgElement.childNodes.length; i++) {
     var childElement = svgElement.childNodes[i];
+    if (!childElement.tagName) { // It is not tag
+      continue;
+    }
 
-    if (childElement.tagName == 'g') { // Realy only for 'g'. Another container elements not supported yet
+    switch (childElement.tagName) {
+    // TODO: Add here converting shapes to paths
+    case 'g':
       if (childElement.childNodes) {
         // For 'g' tag make recursive tree scan with appending current transform attribute value
-        resultPath = merge_paths(childElement, childElement.hasAttribute('transform')
+        result = merge_paths(childElement, ignoreAttributesCallback, ignoreTagsCallback, childElement.hasAttribute('transform')
           ? transform + ' ' + childElement.getAttribute('transform')
-          : transform, resultPath);
+          : transform, result);
+
+          ignoreAttributes(childElement);
       }
-    } else if (childElement.tagName == 'path') {
+      break;
+    case 'path':
       var fullTransformString = transform;
       if (childElement.hasAttribute('transform')) {
         fullTransformString += ' ' + childElement.getAttribute('transform');
@@ -135,11 +149,26 @@ function merge_paths(svgElement, transform, resultPath) {
       }
 
       // Merge paths
-      resultPath += path;
+      result.path += path;
+      result.count++;
+
+      ignoreAttributes(childElement);
+      break;
+    case 'metadata': // Just ignore this tag
+      break;
+    case 'title': // Just ignore this tag
+      break;
+    case 'desc': // Just ignore this tag
+      break;
+    default: // If tag not processed make callback
+      if (typeof(ignoreTagsCallback) == 'function') {
+        ignoreTagsCallback(childElement);
+      }
+      break;
     }
   }
 
-  return resultPath;
+  return result;
 }
 
 //
@@ -194,6 +223,7 @@ function prepare_svg(svgData)
 
   var svgTag = svgTags[0];
 
+  // TODO: Read standard
   // Calculate svg canvas size
   var viewBox = (svgTag.getAttribute('viewBox') || '').split(' ');
   result.x = parseInt(viewBox[0] || svgTag.getAttribute('x') || 0);
@@ -204,38 +234,27 @@ function prepare_svg(svgData)
   var ignoredTags = {};
   var ignoredAttributes = {};
 
-  // Add tags by name to tags ignore list
-  var allTags = svgTag.getElementsByTagName('*');
-  for (var i = 0; i < allTags.length; i++) {
-    // TODO: Add here converting shapes to paths (and append resulting paths to XML tree),
-    // don't forget add your tag to svgAllowedTags object
-    if (!svgAllowedTags[allTags[i].tagName]) {
-      result.isModified = true;
-      ignoredTags[allTags[i].tagName] = true;
-    }
-  }
-
-  // Search for ignored attributes and add it to ignoredAttributes object
-  function add_ignored_attributes(tag) {
-    var attributes = find_presentation_attributes(tag);
-    for (var j = 0; j < attributes.length; j++) {
-      result.isModified = true;
-      ignoredAttributes[attributes[j]] = true;
-    }
-  }
-
   // Ignoring attributes for 'svg'
-  add_ignored_attributes(svgTag);
-
-  // Check for multiple 'path' tag
-  var pathTags = svgTag.getElementsByTagName('path');
-  if (pathTags.length > 1) {
+  var ignoredSvgAttributes = find_presentation_attributes(svgTag);
+  if (ignoredSvgAttributes.length > 0) {
     result.isModified = true;
   }
+  ignoredSvgAttributes.forEach(function (value) {ignoredAttributes[value] = true;});
 
   // Merging all 'path' tags with apply transformation
-  result.path = merge_paths(svgTag);
+  var mergeResult = merge_paths(svgTag, function (xmlElement, attributesArray) {
+    result.isModified = true;
+    attributesArray.forEach(function (value) {ignoredAttributes[value] = true;});
+  }, function (xmlElement) {
+    result.isModified = true;
+    ignoredTags[xmlElement.tagName] = true;
+  });
 
+  // Set result path
+  result.path = mergeResult.path;
+  // If more then one path combined - set isModified flag
+  result.isModified = result.isModified || mergeResult.count > 1;
+  // Create ignored array
   result.ignored = Object.keys(ignoredTags).concat(Object.keys(ignoredAttributes));
 
   return result;

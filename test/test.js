@@ -21,7 +21,7 @@ describe('Imported', function () {
     var svgData = fs.readFileSync(__dirname +'/test_data/multiple_path_with_ignored.svg', 'utf8');
     var result = svg_simplifier(svgData);
     assert.equal(null, result.error);
-    var ignored = ['g', 'enable-background', 'opacity'];
+    var ignored = ['enable-background', 'opacity'];
     for (var i = 0; i < ignored.length; i++) {
       assert.equal(ignored[0], result.ignored[0]);
     }
