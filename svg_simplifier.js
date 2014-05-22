@@ -89,6 +89,58 @@ function find_presentation_attributes (tag) {
 }
 
 //
+// Merge all 'path' tags in svgElement by recursive
+//
+// svgElement - XML node
+//
+// transform - only for recursive call, contains 'transform' attribute data for all parent nodes
+//
+// resultPath - only for recursive call, contains one iteration result
+//
+// Returns string path
+//
+function merge_paths(svgElement, transform, resultPath) {
+  if (!transform) {
+    transform = '';
+  }
+  if (!resultPath) {
+    resultPath = '';
+  }
+
+  for (var i = 0; i < svgElement.childNodes.length; i++) {
+    var childElement = svgElement.childNodes[i];
+
+    if (childElement.tagName == 'g') { // Realy only for 'g'. Another container elements not supported yet
+      if (childElement.childNodes) {
+        // For 'g' tag make recursive tree scan with appending current transform attribute value
+        resultPath = merge_paths(childElement, childElement.hasAttribute('transform')
+          ? transform + ' ' + childElement.getAttribute('transform')
+          : transform, resultPath);
+      }
+    } else if (childElement.tagName == 'path') {
+      var fullTransformString = transform;
+      if (childElement.hasAttribute('transform')) {
+        fullTransformString += ' ' + childElement.getAttribute('transform');
+      }
+
+      var path = childElement.getAttribute('d');
+
+      if (fullTransformString != '') {
+        // Apply transform attributes
+        path = (new SvgPath(path))
+          .transform(fullTransformString)
+          .toString();
+      }
+
+      // Merge paths
+      resultPath += path;
+    }
+  }
+
+  return resultPath;
+}
+
+//
 // Prepares SVG data to use as glyph icon.
 //
 // svgData - XML data from SVG file
@@ -173,42 +225,14 @@ function prepare_svg(svgData)
   // Ignoring attributes for 'svg'
   add_ignored_attributes(svgTag);
 
+  // Check for multiple 'path' tag
   var pathTags = svgTag.getElementsByTagName('path');
   if (pathTags.length > 1) {
     result.isModified = true;
   }
-  for (var i = 0; i < pathTags.length; i++) {
-    var transformString = '';
-    // Ignoring attributes for 'g'
-    if (pathTags[i].parentNode && pathTags[i].parentNode.tagName == 'g') {
-      add_ignored_attributes(pathTags[i].parentNode);
 
-      // Get transform attribute for parent 'g'
-      if (pathTags[i].parentNode.hasAttribute('transform')) {
-        transformString = pathTags[i].parentNode.getAttribute('transform');
-      }
-    }
-
-    // Ignoring attributes for 'path'
-    add_ignored_attributes(pathTags[i]);
-
-    // Get transform attribute for 'path'
-    if (pathTags[i].hasAttribute('transform')) {
-      transformString += ' ' + pathTags[i].getAttribute('transform');
-    }
-
-    var path = pathTags[i].getAttribute('d');
-
-    if (transformString != '') {
-      // Apply transform attributes
-      path = (new SvgPath(path))
-        .transform(transformString)
-        .toString();
-    }
-
-		// Merge paths
-    result.path += path;
-  }
+  // Merging all 'path' tags with apply transformation
+  result.path = merge_paths(svgTag);
 
   result.ignored = Object.keys(ignoredTags).concat(Object.keys(ignoredAttributes));
 
