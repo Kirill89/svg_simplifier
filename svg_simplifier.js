@@ -171,6 +171,54 @@ function merge_paths(svgElement, ignoreAttributesCallback, ignoreTagsCallback, t
   return result;
 }
 
+
+//
+// Calculating viewport size
+//
+// viewport - object (x, y, width, height) from attributes of 'svg' tag
+//
+// viewBox - viewbox attribute of 'svg' tag
+//
+// preserveAspectRatio - preserveaspectratio attribute of 'svg' tag
+//
+// Returns object (x, y, width, height)
+//
+function get_real_viewport_size(viewport, viewBox, preserveAspectRatio) {
+  if (viewBox) {
+    var viewBoxParts = viewBox.split(/[ ,]+/);
+    viewBox = {
+      'x': parseInt(viewBoxParts[0]),
+      'y': parseInt(viewBoxParts[1]),
+      'width': parseInt(viewBoxParts[2]),
+      'height': parseInt(viewBoxParts[3])
+    };
+  }
+  if (preserveAspectRatio) {
+    preserveAspectRatio = (preserveAspectRatio.split(/\s+/))[0]; // Ignoring meetOrSlice parameter
+  }
+
+  if (viewBox && preserveAspectRatio) {
+    switch (preserveAspectRatio) {
+    case 'xMinYMin':
+      return {
+        'x': viewport.x,
+        'y': viewport.y,
+        'width': viewBox.width,
+        'height': viewBox.height
+      };
+      break;
+    // TODO: Add other cases from here http://www.w3.org/TR/SVG/coords.html#PreserveAspectRatioAttribute
+    default:
+      return viewBox;
+      break;
+    }
+  } else if (viewBox) {
+    return viewBox;
+  } else {
+    return viewport;
+  }
+}
+
 //
 // Prepares SVG data to use as glyph icon.
 //
@@ -223,13 +271,21 @@ function prepare_svg(svgData)
 
   var svgTag = svgTags[0];
 
-  // TODO: Read standard
   // Calculate svg canvas size
-  var viewBox = (svgTag.getAttribute('viewBox') || '').split(' ');
-  result.x = parseInt(viewBox[0] || svgTag.getAttribute('x') || 0);
-  result.y = parseInt(viewBox[1] || svgTag.getAttribute('y') || 0);
-  result.width = parseInt(viewBox[2] || svgTag.getAttribute('width'));
-  result.height = parseInt(viewBox[3] || svgTag.getAttribute('height'));
+  var viewportSize = get_real_viewport_size(
+    {
+      'x': parseInt(svgTag.getAttribute('x') || 0),
+      'y': parseInt(svgTag.getAttribute('y') || 0),
+      'width': parseInt(svgTag.getAttribute('width')),
+      'height':parseInt( svgTag.getAttribute('height'))
+    },
+    svgTag.getAttribute('viewBox'),
+    svgTag.getAttribute('preserveAspectRatio')
+  );
+  result.x = viewportSize.x;
+  result.y = viewportSize.y;
+  result.width = viewportSize.width;
+  result.height = viewportSize.height;
 
   var ignoredTags = {};
   var ignoredAttributes = {};
